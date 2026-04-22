@@ -41,56 +41,57 @@ export default function Home() {
   };
 
   // 🎧 播放语音
-  const playAudio = async () => {
-    if (!story) return alert("请先生成故事");
+const playAudio = async () => {
+  if (!story) return alert("请先生成故事");
 
-    setPlaying(true);
+  setPlaying(true);
 
-    try {
-      const res = await fetch("/api/tts", {
-        method: "POST",
-        body: JSON.stringify({ text: story }),
-      });
+  try {
+    const res = await fetch("/api/tts", {
+      method: "POST",
+      body: JSON.stringify({ text: story }),
+    });
 
-      const data = await res.json();
-      const base64 = data.audioBase64 || data.data;
+    const data = await res.json();
+    const base64 = data.audioBase64 || data.data;
 
-      if (!base64) {
-        alert("语音生成失败");
-        setPlaying(false);
-        return;
-      }
-
-      // 停止旧音频
-      if (audioRef.current) {
-        audioRef.current.pause();
-        audioRef.current = null;
-      }
-
-      const audio = new Audio(`data:audio/mp3;base64,${base64}`);
-      audioRef.current = audio;
-
-      audio.play();
-
-      audio.onended = () => {
-        setPlaying(false);
-        audioRef.current = null;
-      };
-    } catch (e) {
-      console.error(e);
+    if (!base64) {
+      alert("语音生成失败");
       setPlaying(false);
+      return;
     }
-  };
+
+    const audioEl = audioRef.current;
+
+    if (!audioEl) return;
+
+    audioEl.src = `data:audio/mp3;base64,${base64}`;
+
+    await audioEl.play(); // ✅ 关键：必须直接 play DOM
+
+  } catch (e) {
+    console.error(e);
+    setPlaying(false);
+  }
+};
 
   // 🛑 停止播放
-  const stopAudio = () => {
-    if (audioRef.current) {
-      audioRef.current.pause();
-      audioRef.current.currentTime = 0;
-      audioRef.current = null;
-    }
-    setPlaying(false);
-  };
+const stopAudio = () => {
+  const audioEl = audioRef.current;
+
+  if (audioEl) {
+    audioEl.pause();
+    audioEl.currentTime = 0;
+  }
+
+  setPlaying(false);
+};
+
+
+<audio
+  ref={audioRef}
+  onEnded={() => setPlaying(false)}
+/>
 
   return (
     <main style={pageStyle}>
@@ -168,6 +169,7 @@ export default function Home() {
     </main>
   );
 }
+
 
 /* ===================== */
 /* 🎨 样式 */

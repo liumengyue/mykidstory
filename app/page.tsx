@@ -243,7 +243,11 @@ const cardStyle = {
   padding: 20,
 };
 
-const sloganStyle = { textAlign: "center", color: "#888" };
+const sloganStyle: React.CSSProperties = {
+  textAlign: "center",
+  color: "#888",
+};
+
 const labelStyle = { marginTop: 10, display: "block" };
 
 const inputStyle = {

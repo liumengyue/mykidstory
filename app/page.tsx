@@ -3,7 +3,7 @@
 import { useState, useRef } from "react";
 
 export default function Home() {
-  // 🧠 默认值（提升首次体验）
+  // 🧠 默认值
   const [character, setCharacter] = useState("小猫咪");
   const [scene, setScene] = useState("城市");
   const [theme, setTheme] = useState("冒险");
@@ -40,58 +40,53 @@ export default function Home() {
     }
   };
 
-  // 🎧 播放语音
-const playAudio = async () => {
-  if (!story) return alert("请先生成故事");
+  // 🎧 播放语音（✅ 手机兼容版本）
+  const playAudio = async () => {
+    if (!story) return alert("请先生成故事");
 
-  setPlaying(true);
+    setPlaying(true);
 
-  try {
-    const res = await fetch("/api/tts", {
-      method: "POST",
-      body: JSON.stringify({ text: story }),
-    });
+    try {
+      const res = await fetch("/api/tts", {
+        method: "POST",
+        body: JSON.stringify({ text: story }),
+      });
 
-    const data = await res.json();
-    const base64 = data.audioBase64 || data.data;
+      const data = await res.json();
+      const base64 = data.audioBase64 || data.data;
 
-    if (!base64) {
-      alert("语音生成失败");
+      if (!base64) {
+        alert("语音生成失败");
+        setPlaying(false);
+        return;
+      }
+
+      const audioEl = audioRef.current;
+      if (!audioEl) return;
+
+      // 设置音频源
+      audioEl.src = `data:audio/mp3;base64,${base64}`;
+
+      // 播放（关键）
+      await audioEl.play();
+
+    } catch (e) {
+      console.error(e);
       setPlaying(false);
-      return;
     }
-
-    const audioEl = audioRef.current;
-
-    if (!audioEl) return;
-
-    audioEl.src = `data:audio/mp3;base64,${base64}`;
-
-    await audioEl.play(); // ✅ 关键：必须直接 play DOM
-
-  } catch (e) {
-    console.error(e);
-    setPlaying(false);
-  }
-};
+  };
 
   // 🛑 停止播放
-const stopAudio = () => {
-  const audioEl = audioRef.current;
+  const stopAudio = () => {
+    const audioEl = audioRef.current;
 
-  if (audioEl) {
-    audioEl.pause();
-    audioEl.currentTime = 0;
-  }
+    if (audioEl) {
+      audioEl.pause();
+      audioEl.currentTime = 0;
+    }
 
-  setPlaying(false);
-};
-
-
-<audio
-  ref={audioRef}
-  onEnded={() => setPlaying(false)}
-/>
+    setPlaying(false);
+  };
 
   return (
     <main style={pageStyle}>
@@ -107,7 +102,6 @@ const stopAudio = () => {
 
         {/* ✍️ 输入区 */}
         <div style={{ marginTop: 16 }}>
-          {/* 角色 */}
           <label style={labelStyle}>🧸 故事角色</label>
           <input
             value={character}
@@ -116,7 +110,6 @@ const stopAudio = () => {
             style={inputStyle}
           />
 
-          {/* 场景 */}
           <label style={labelStyle}>🌍 故事发生的地方</label>
           <input
             value={scene}
@@ -125,7 +118,6 @@ const stopAudio = () => {
             style={inputStyle}
           />
 
-          {/* 主题 */}
           <label style={labelStyle}>💡 故事主题</label>
           <input
             value={theme}
@@ -134,7 +126,6 @@ const stopAudio = () => {
             style={inputStyle}
           />
 
-          {/* 想法 */}
           <label style={labelStyle}>👶 宝宝的想法（最重要）</label>
           <input
             value={childInput}
@@ -151,7 +142,7 @@ const stopAudio = () => {
           </button>
 
           <button onClick={playAudio} disabled={!story || playing} style={btnPlay}>
-            🎧 播放
+            🎧 {playing ? "播放中..." : "播放"}
           </button>
 
           <button onClick={stopAudio} disabled={!playing} style={btnStop}>
@@ -165,11 +156,16 @@ const stopAudio = () => {
             📖 {story}
           </div>
         )}
+
+        {/* ✅ 关键：真实 audio 元素（手机播放必须） */}
+        <audio
+          ref={audioRef}
+          onEnded={() => setPlaying(false)}
+        />
       </div>
     </main>
   );
 }
-
 
 /* ===================== */
 /* 🎨 样式 */

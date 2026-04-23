@@ -5,7 +5,7 @@ export async function POST(req) {
     const { character, scene, theme, child_input } = body;
 
   const prompt = `
-你是一位专业儿童绘本作家，拥有多年出版经验，作品适合3-5岁孩子阅读和家长讲述。
+你是一位专业儿童绘本作家，拥有多年出版经验，作品适合3岁孩子阅读和家长讲述。
 
 请根据用户输入创作一个温暖、有画面感的故事。
 
@@ -37,13 +37,11 @@ export async function POST(req) {
 - 用动作和情境表达情绪
 - 可以适当重复关键词（例如“小兔子轻轻地走着”）
 
-【用户输入】
-角色：{character}
-场景：{scene}
-主题：{theme}
-孩子的话：{child_input}
-
-【输出要求】
+要求：
+- 主角：${character}
+- 故事发生在：${scene}
+- 主题：${theme}
+- 故事灵感来自宝宝的想法：${child_input}
 - 只输出故事正文
 - 不要标题
 - 不要解释

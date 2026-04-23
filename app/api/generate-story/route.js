@@ -2,7 +2,16 @@ export const runtime = 'edge';
 export async function POST(req) {
   try {
     const body = await req.json();
-    const { character, scene, theme, child_input } = body;
+    const { character, scene, theme, child_input, length } = body;
+
+ /* ===================== */
+    /* 📏 长度控制 */
+    /* ===================== */
+    let wordCount = 200;
+
+    if (length === "短") wordCount = 100;
+    if (length === "中") wordCount = 200;
+    if (length === "长") wordCount = 400;
 
   const prompt = `
 你是一位专业儿童绘本作家，拥有多年出版经验，作品适合3岁孩子阅读和家长讲述。
@@ -10,7 +19,7 @@ export async function POST(req) {
 请根据用户输入创作一个温暖、有画面感的故事。
 
 【核心要求】
-- 总字数：220~300字
+- 总字数：大约 ${wordCount} 字
 - 分为4段，每段1~2句
 - 每段适合作为一页绘本
 - 语言简单、重复感适度（增强记忆）
@@ -36,6 +45,7 @@ export async function POST(req) {
 - 避免抽象说教（不要“要勇敢”这种直说）
 - 用动作和情境表达情绪
 - 可以适当重复关键词（例如“小兔子轻轻地走着”）
+- 温柔、轻松、有趣
 
 要求：
 - 主角：${character}

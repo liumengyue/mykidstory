@@ -7,6 +7,7 @@ export default function Home() {
   const [scene, setScene] = useState("城市");
   const [theme, setTheme] = useState("冒险");
   const [childInput, setChildInput] = useState("我想听一个故事");
+  const [length, setLength] = useState("中");
 
   const [story, setStory] = useState("");
   const [loading, setLoading] = useState(false);
@@ -18,16 +19,14 @@ export default function Home() {
   const [currentTime, setCurrentTime] = useState(0);
 
   const audioRef = useRef<HTMLAudioElement | null>(null);
-  
-  const [length, setLength] = useState("短");
 
   /* ===================== */
-  /* 📖 生成故事 + 自动播放 */
+  /* 📖 生成故事 */
   /* ===================== */
   const generateStory = async () => {
     setLoading(true);
     setStory("");
-    setAudioUrl(null);
+    stopAudio();
 
     try {
       const res = await fetch("/api/generate-story", {
@@ -37,17 +36,12 @@ export default function Home() {
           scene,
           theme,
           child_input: childInput,
-		  length, 
+          length,
         }),
       });
 
       const data = await res.json();
-      const newStory = data.story || "";
-      setStory(newStory);
-
-      // ⭐ 自动播放
-      await handlePlay(newStory);
-
+      setStory(data.story || "");
     } catch (e) {
       console.error(e);
     } finally {
@@ -56,7 +50,7 @@ export default function Home() {
   };
 
   /* ===================== */
-  /* 🎧 获取音频 */
+  /* 🎧 获取音频（关键稳定写法） */
   /* ===================== */
   const fetchAudio = async (text: string) => {
     const res = await fetch("/api/tts", {
@@ -67,19 +61,29 @@ export default function Home() {
     const data = await res.json();
     const base64 = data.audioBase64 || data.data;
 
-    const byteCharacters = atob(base64);
-    const byteArray = new Uint8Array(
-      [...byteCharacters].map((c) => c.charCodeAt(0))
-    );
+    if (!base64) throw new Error("no audio");
 
+    // ✅ base64 → Blob（最稳定方案）
+    const byteCharacters = atob(base64);
+    const byteNumbers = new Array(byteCharacters.length)
+      .fill(0)
+      .map((_, i) => byteCharacters.charCodeAt(i));
+
+    const byteArray = new Uint8Array(byteNumbers);
     const blob = new Blob([byteArray], { type: "audio/mpeg" });
+
     return URL.createObjectURL(blob);
   };
 
   /* ===================== */
-  /* ▶️ 播放 */
+  /* ▶️ 播放（移动端稳定核心） */
   /* ===================== */
-  const handlePlay = async (text?: string) => {
+  const handlePlay = async () => {
+    if (!story) {
+      alert("请先生成故事");
+      return;
+    }
+
     const audio = audioRef.current;
     if (!audio) return;
 
@@ -89,23 +93,29 @@ export default function Home() {
       let url = audioUrl;
 
       if (!url) {
-        url = await fetchAudio(text || story);
+        url = await fetchAudio(story);
         setAudioUrl(url);
       }
 
       audio.src = url;
+      audio.load(); // ⭐关键：强制加载
+
+      // ⭐ 等待可播放（解决0秒问题）
+      await new Promise<void>((resolve) => {
+        audio.oncanplaythrough = () => resolve();
+      });
 
       await audio.play();
     } catch (e) {
-      console.error(e);
+      console.error("播放失败", e);
       setPlaying(false);
     }
   };
 
   /* ===================== */
-  /* ⏸️ 暂停 / 继续 */
+  /* ⏸️ 暂停/继续 */
   /* ===================== */
-  const togglePlay = () => {
+  const togglePlay = async () => {
     const audio = audioRef.current;
     if (!audio) return;
 
@@ -113,8 +123,12 @@ export default function Home() {
       audio.pause();
       setPlaying(false);
     } else {
-      audio.play();
-      setPlaying(true);
+      try {
+        await audio.play();
+        setPlaying(true);
+      } catch (e) {
+        console.error(e);
+      }
     }
   };
 
@@ -131,9 +145,9 @@ export default function Home() {
   };
 
   /* ===================== */
-  /* ⏱️ 拖动进度 */
+  /* ⏱️ 拖动进度（去掉 any） */
   /* ===================== */
-const handleSeek = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleSeek = (e: React.ChangeEvent<HTMLInputElement>) => {
     const audio = audioRef.current;
     if (!audio) return;
 
@@ -146,52 +160,49 @@ const handleSeek = (e: React.ChangeEvent<HTMLInputElement>) => {
     <main style={pageStyle}>
       <div style={cardStyle}>
         <h1 style={{ textAlign: "center" }}>🧸 MyKidStory</h1>
-        <p style={sloganStyle}>
+
+        <p style={sloganStyle as React.CSSProperties}>
           每一个故事，都来自宝宝自己的想象。
         </p>
 
-        {/* 输入 */}
-        <div>
-          <label style={labelStyle}>🧸 角色</label>
-          <input value={character} onChange={(e) => setCharacter(e.target.value)} style={inputStyle} />
+        {/* 输入区 */}
+        <label>角色</label>
+        <input value={character} onChange={(e) => setCharacter(e.target.value)} style={inputStyle} />
 
-          <label style={labelStyle}>🌍 场景</label>
-          <input value={scene} onChange={(e) => setScene(e.target.value)} style={inputStyle} />
+        <label>场景</label>
+        <input value={scene} onChange={(e) => setScene(e.target.value)} style={inputStyle} />
 
-          <label style={labelStyle}>💡 主题</label>
-          <input value={theme} onChange={(e) => setTheme(e.target.value)} style={inputStyle} />
-		  
-		  <label style={labelStyle}>👶 宝宝想法</label>
-          <input value={childInput} onChange={(e) => setChildInput(e.target.value)} style={inputStyle} />
-		  
-		  <label style={labelStyle}>📏 故事长度</label>
-          <select value={length} onChange={(e) => setLength(e.target.value)} style={inputStyle}>
-            <option value="短">🐣 短（约100字）</option>
-            <option value="中">🌟 中（约200字）</option>
-            <option value="长">🌙 长（约400字）</option>
-          </select>
+        <label>主题</label>
+        <input value={theme} onChange={(e) => setTheme(e.target.value)} style={inputStyle} />
 
-         
-        </div>
+        <label>故事长度</label>
+        <select value={length} onChange={(e) => setLength(e.target.value)} style={inputStyle}>
+          <option value="短">短</option>
+          <option value="中">中</option>
+          <option value="长">长</option>
+        </select>
+
+        <label>宝宝想法</label>
+        <input value={childInput} onChange={(e) => setChildInput(e.target.value)} style={inputStyle} />
 
         {/* 按钮 */}
         <div style={btnRow}>
           <button onClick={generateStory} style={btnPrimary}>
-            {loading ? "生成中..." : "✨ 生成并播放"}
+            {loading ? "生成中..." : "生成故事"}
           </button>
 
-          <button onClick={togglePlay} disabled={!audioUrl} style={btnPlay}>
-            {playing ? "⏸️ 暂停" : "▶️ 继续"}
+          <button onClick={handlePlay} style={btnPlay}>
+            {playing ? "播放中..." : "播放"}
           </button>
 
           <button onClick={stopAudio} style={btnStop}>
-            🛑 停止
+            停止
           </button>
         </div>
 
-        {/* 🎧 进度条 */}
+        {/* 进度条 */}
         {audioUrl && (
-          <div style={{ marginTop: 12 }}>
+          <div style={{ marginTop: 10 }}>
             <input
               type="range"
               min={0}
@@ -200,46 +211,43 @@ const handleSeek = (e: React.ChangeEvent<HTMLInputElement>) => {
               onChange={handleSeek}
               style={{ width: "100%" }}
             />
-
-            <div style={{ fontSize: 12, color: "#888" }}>
-              {Math.floor(currentTime)}s / {Math.floor(duration)}s
+            <div style={{ fontSize: 12 }}>
+              {Math.floor(currentTime)} / {Math.floor(duration)} s
             </div>
           </div>
         )}
 
-        {/* 📖 故事 */}
-        {story && <div style={storyBox}>📖 {story}</div>}
+        {/* 故事 */}
+        {story && <div style={storyBox}>{story}</div>}
 
-        {/* 🎧 核心 audio */}
+        {/* 🎧 核心播放器 */}
         <audio
           ref={audioRef}
+          preload="auto"
+          playsInline
           onEnded={() => setPlaying(false)}
-          onTimeUpdate={(e) =>
-            setCurrentTime(e.currentTarget.currentTime)
-          }
-          onLoadedMetadata={(e) =>
-            setDuration(e.currentTarget.duration)
-          }
+          onTimeUpdate={(e) => setCurrentTime(e.currentTarget.currentTime)}
+          onLoadedMetadata={(e) => setDuration(e.currentTarget.duration)}
         />
       </div>
     </main>
   );
 }
 
-/* 样式保持不变 */
-const pageStyle = {
+/* 样式 */
+const pageStyle: React.CSSProperties = {
   minHeight: "100vh",
-  background: "linear-gradient(#fdf6f0, #f3f7ff)",
+  background: "#f5f7ff",
   display: "flex",
   justifyContent: "center",
   padding: 20,
 };
 
-const cardStyle = {
-  maxWidth: 520,
+const cardStyle: React.CSSProperties = {
   width: "100%",
+  maxWidth: 520,
   background: "#fff",
-  borderRadius: 22,
+  borderRadius: 20,
   padding: 20,
 };
 
@@ -248,43 +256,45 @@ const sloganStyle: React.CSSProperties = {
   color: "#888",
 };
 
-const labelStyle = { marginTop: 10, display: "block" };
-
-const inputStyle = {
+const inputStyle: React.CSSProperties = {
   width: "100%",
   padding: 10,
   borderRadius: 10,
-  border: "1px solid #eee",
+  marginBottom: 8,
 };
 
-const btnRow = { display: "flex", gap: 10, marginTop: 12 };
+const btnRow: React.CSSProperties = {
+  display: "flex",
+  gap: 10,
+  marginTop: 10,
+};
 
-const btnPrimary = {
+const btnPrimary: React.CSSProperties = {
   flex: 1,
   background: "#ff7aa2",
   color: "#fff",
   padding: 10,
-  borderRadius: 12,
+  borderRadius: 10,
 };
 
-const btnPlay = {
+const btnPlay: React.CSSProperties = {
   flex: 1,
   background: "#6ec1e4",
   color: "#fff",
   padding: 10,
-  borderRadius: 12,
+  borderRadius: 10,
 };
 
-const btnStop = {
+const btnStop: React.CSSProperties = {
   background: "#ff5c5c",
   color: "#fff",
   padding: 10,
-  borderRadius: 12,
+  borderRadius: 10,
 };
 
-const storyBox = {
+const storyBox: React.CSSProperties = {
   marginTop: 20,
   padding: 12,
   background: "#fffaf3",
-  borderRadius: 12,
+  borderRadius: 10,
 };

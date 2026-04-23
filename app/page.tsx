@@ -133,7 +133,7 @@ export default function Home() {
   /* ===================== */
   /* ⏱️ 拖动进度 */
   /* ===================== */
-  const handleSeek = (e: any) => {
+const handleSeek = (e: React.ChangeEvent<HTMLInputElement>) => {
     const audio = audioRef.current;
     if (!audio) return;
 

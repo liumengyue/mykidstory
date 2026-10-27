@@ -1,4 +1,4 @@
-import { CHARACTERS, BACKGROUNDS, ACTIONS, normalizeScenes, fallbackScenes, extractJson } from "../../../lib/storyScenes";
+import { CHARACTERS, BACKGROUNDS, ACTIONS, PROPS, PLACES, EFFECTS, normalizeScenes, fallbackScenes, extractJson } from "../../../lib/storyScenes";
 
 export const runtime = 'edge';
 
@@ -68,15 +68,28 @@ export async function POST(req) {
   "hero": "主角形象",
   "friend": "配角形象，或 null",
   "scenes": [
-    { "bg": "背景", "friend_present": true, "hero_action": "主角动作", "friend_action": "配角动作" }
+    {
+      "bg": "背景",
+      "effect": "天气效果",
+      "friend_present": false,
+      "beats": [
+        { "text": "本段第1句原文", "hero_action": "动作", "friend_action": "动作", "props": [{ "name": "道具", "place": "位置" }] },
+        { "text": "本段第2句原文", "hero_action": "动作", "friend_action": "动作", "props": [] }
+      ]
+    }
   ]
 }
 
-字段说明（这些字段用来生成动画，只能从下面的英文值里选）：
+字段说明（这些字段用来生成动画，只能从下面的英文值里选，不要自己造词）：
 - hero / friend 只能是：${list(CHARACTERS)}。主角“${character}”如果不在其中，选外形最接近的一个。
-- bg 只能是：${list(BACKGROUNDS)}
-- hero_action / friend_action 只能是：${list(ACTIONS)}
-- scenes 与 paragraphs 一一对应，共4个；动作要符合该段的情绪
+- bg 只能是：${list(BACKGROUNDS)}。按每段实际发生的地点选，可以每段不同（例如“趴在窗台上”选 home）。
+- effect 只能是：${list(EFFECTS)}
+- scenes 与 paragraphs 一一对应，共4个。
+- beats：把这一段按句子拆成 1~3 个镜头，text 必须是该段原文里的连续文字，所有 beats 的 text 连起来就是整段。
+- hero_action / friend_action 只能是：${list(ACTIONS)}。要贴合这一句里角色在做的事。
+- props：这一句里出现的具体物品，最多2个。name 只能是：${list(PROPS)}；place 只能是：${list(PLACES)}。
+  同一个物品在不同镜头里用不同 place 表达它的变化，例如蝴蝶结：hold（戴着）→ fly（被风吹走）→ high（挂在树上）→ fall（拿下来）→ hold。
+  故事里没有对应物品就不填，不要硬加。
 `;
 
     const response = await fetch("https://api.siliconflow.cn/v1/chat/completions", {
@@ -93,7 +106,7 @@ export async function POST(req) {
             content: prompt,
           },
         ],
-        max_tokens: 1500,
+        max_tokens: 3000, // 分镜里会重复一遍原文，长故事需要更多 token
         temperature: 0.8,
       }),
     });

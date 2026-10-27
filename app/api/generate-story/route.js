@@ -17,6 +17,20 @@ export async function POST(req) {
     if (length === "中") wordCount = 200;
     if (length === "长") wordCount = 400;
 
+    // 3分钟动画：豆包 0.85 倍速约每秒 4 字，550 字旁白约 2.5 分钟，加上镜头间停顿约 3 分钟
+    const isAnimation = length === "动画";
+    if (isAnimation) wordCount = 550;
+    const paragraphCount = isAnimation ? 8 : 4;
+    const structure = isAnimation
+      ? `第1~2段：建立画面（角色 + 场景 + 温馨氛围）
+第3~4段：出现小困扰（轻微冲突，不制造恐惧）
+第5~6段：尝试解决（可以先失败一次，再想办法；鼓励主动、勇敢或思考）
+第7~8段：温暖收尾（积极结果 + 情感升华）`
+      : `第1段：建立画面（角色 + 场景 + 温馨氛围）
+第2段：出现小困扰（轻微冲突，不制造恐惧）
+第3段：尝试解决（鼓励主动、勇敢或思考）
+第4段：温暖收尾（积极结果 + 情感升华）`;
+
   const prompt = `
 你是一位专业儿童绘本作家，拥有多年出版经验，作品适合3岁孩子阅读和家长讲述。
 
@@ -24,17 +38,14 @@ export async function POST(req) {
 
 【核心要求】
 - 总字数：大约 ${wordCount} 字
-- 分为4段，每段1~2句
+- 分为${paragraphCount}段，每段${isAnimation ? "2~3" : "1~2"}句
 - 每段适合作为一页绘本
 - 语言简单、重复感适度（增强记忆）
 - 句子节奏柔和，适合朗读
 - 必须有情绪变化（平静 → 紧张 → 尝试 → 温暖）
 
 【结构要求】
-第1段：建立画面（角色 + 场景 + 温馨氛围）
-第2段：出现小困扰（轻微冲突，不制造恐惧）
-第3段：尝试解决（鼓励主动、勇敢或思考）
-第4段：温暖收尾（积极结果 + 情感升华）
+${structure}
 
 【教育目标（隐性）】
 自然传递以下其中1-2个价值：
@@ -64,7 +75,7 @@ export async function POST(req) {
 【输出格式】
 只输出一个 JSON 对象，不要任何其他文字，不要代码块标记：
 {
-  "paragraphs": ["第1段", "第2段", "第3段", "第4段"],
+  "paragraphs": ["第1段", "第2段", "……共${paragraphCount}段"],
   "hero": "主角形象",
   "friend": "配角形象，或 null",
   "scenes": [
@@ -84,7 +95,7 @@ export async function POST(req) {
 - hero / friend 只能是：${list(CHARACTERS)}。主角“${character}”如果不在其中，选外形最接近的一个。
 - bg 只能是：${list(BACKGROUNDS)}。按每段实际发生的地点选，可以每段不同（例如“趴在窗台上”选 home）。
 - effect 只能是：${list(EFFECTS)}
-- scenes 与 paragraphs 一一对应，共4个。
+- scenes 与 paragraphs 一一对应，共${paragraphCount}个。
 - beats：把这一段按句子拆成 1~3 个镜头，text 必须是该段原文里的连续文字，所有 beats 的 text 连起来就是整段。
 - hero_action / friend_action 只能是：${list(ACTIONS)}。要贴合这一句里角色在做的事。
 - props：这一句里出现的具体物品，最多2个。name 只能是：${list(PROPS)}；place 只能是：${list(PLACES)}。
@@ -106,7 +117,7 @@ export async function POST(req) {
             content: prompt,
           },
         ],
-        max_tokens: 3000, // 分镜里会重复一遍原文，长故事需要更多 token
+        max_tokens: isAnimation ? 4500 : 3000, // 分镜里会重复一遍原文，长故事需要更多 token
         temperature: 0.8,
       }),
     });

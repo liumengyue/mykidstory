@@ -23,7 +23,7 @@ export default function Home() {
   const [scene, setScene] = useState("城市");
   const [theme, setTheme] = useState("冒险");
   const [childInput, setChildInput] = useState("我想听一个故事");
-  const [length, setLength] = useState("中");
+  const [length, setLength] = useState("动画");
 
   const [story, setStory] = useState("");
   const [animation, setAnimation] = useState<StoryAnimationData | null>(null);
@@ -205,6 +205,7 @@ export default function Home() {
           <option value="短">短</option>
           <option value="中">中</option>
           <option value="长">长</option>
+          <option value="动画">3分钟动画</option>
         </select>
 
         <label>宝宝想法</label>

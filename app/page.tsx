@@ -1,15 +1,19 @@
 "use client";
 
 import { useState, useRef } from "react";
+import StoryAnimation, { type StoryAnimationData } from "./components/StoryAnimation";
+
 
 export default function Home() {
   const [character, setCharacter] = useState("小猫咪");
   const [scene, setScene] = useState("城市");
   const [theme, setTheme] = useState("冒险");
   const [childInput, setChildInput] = useState("我想听一个故事");
-  const [length, setLength] = useState("中");
+  const [length, setLength] = useState("动画");
 
   const [story, setStory] = useState("");
+  const [animation, setAnimation] = useState<StoryAnimationData | null>(null);
+  const [showAnimation, setShowAnimation] = useState(false);
   const [loading, setLoading] = useState(false);
 
   const [playing, setPlaying] = useState(false);
@@ -26,6 +30,8 @@ export default function Home() {
   const generateStory = async () => {
     setLoading(true);
     setStory("");
+    setAnimation(null);
+    setAudioUrl(null);
     stopAudio();
 
     try {
@@ -41,7 +47,12 @@ export default function Home() {
       });
 
       const data = await res.json();
+      if (!res.ok) {
+        alert("故事生成失败，请稍后再试");
+        return;
+      }
       setStory(data.story || "");
+      setAnimation(data.animation || null);
     } catch (e) {
       console.error(e);
     } finally {
@@ -180,6 +191,7 @@ export default function Home() {
           <option value="短">短</option>
           <option value="中">中</option>
           <option value="长">长</option>
+          <option value="动画">3分钟动画</option>
         </select>
 
         <label>宝宝想法</label>
@@ -200,6 +212,18 @@ export default function Home() {
           </button>
         </div>
 
+        {animation && (
+          <button
+            onClick={() => {
+              stopAudio();
+              setShowAnimation(true);
+            }}
+            style={btnAnimation}
+          >
+            🎬 看动画
+          </button>
+        )}
+
         {/* 进度条 */}
         {audioUrl && (
           <div style={{ marginTop: 10 }}>
@@ -219,6 +243,13 @@ export default function Home() {
 
         {/* 故事 */}
         {story && <div style={storyBox}>{story}</div>}
+
+        {showAnimation && animation && (
+          <StoryAnimation
+            animation={animation}
+            onClose={() => setShowAnimation(false)}
+          />
+        )}
 
         {/* 🎧 核心播放器 */}
         <audio
@@ -283,6 +314,16 @@ const btnPlay: React.CSSProperties = {
   color: "#fff",
   padding: 10,
   borderRadius: 10,
+};
+
+const btnAnimation: React.CSSProperties = {
+  width: "100%",
+  marginTop: 10,
+  background: "#9b6bff",
+  color: "#fff",
+  padding: 12,
+  borderRadius: 10,
+  fontSize: 18,
 };
 
 const btnStop: React.CSSProperties = {

@@ -2,6 +2,7 @@ import { CHARACTERS, BACKGROUNDS, ACTIONS, PROPS, PLACES, EFFECTS, normalizeScen
 
 export const runtime = 'edge';
 
+const names = (obj) => Object.values(obj).join("、");
 const list = (obj) => Object.entries(obj).map(([k, v]) => `${k}（${v}）`).join("、");
 export async function POST(req) {
   try {
@@ -71,6 +72,19 @@ ${structure}
 - 不要解释
 
 输出风格接近波西和皮普的故事。
+
+【动画限制（最重要，必须遵守）】
+这个故事会被自动做成动画，动画只能画出下面这些东西。故事里写到的每个动作、物品、地点都必须能在下面找到，否则画面会和文字对不上：
+- 角色：最多两个，主角 + 最多一个朋友，种类只能是：${names(CHARACTERS)}（可以起名字）。
+  如果主角“${character}”不是这几种，就改成外形最接近的一种，故事里也直接这样写。
+- 地点只能是：${names(BACKGROUNDS)}
+- 角色能做的事只能是：${names(ACTIONS)}。
+  不要写列表以外的动作，例如游泳、飞、骑车、开车、钻洞、画画、唱歌、洗澡。
+- 物品只能是：${names(PROPS)}。不要写列表以外的物品。
+- 物品能发生的变化只能是：${names(PLACES)}
+- 天气只能是：${names(EFFECTS)}
+- 宝宝的想法里如果有列表以外的东西，用列表里最接近的来表达（例如“小火车”写成“小汽车”，“飞上天”写成“坐着气球看天空”）。
+- 角色身上的蝴蝶结如果在故事里被吹走、弄丢，props 里要用 bow 表示它的变化。
 
 【输出格式】
 只输出一个 JSON 对象，不要任何其他文字，不要代码块标记：

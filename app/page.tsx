@@ -3,20 +3,6 @@
 import { useState, useRef } from "react";
 import StoryAnimation, { type StoryAnimationData } from "./components/StoryAnimation";
 
-/** 调用 /api/tts，返回 mp3 的二进制数据 */
-async function fetchSpeech(text: string): Promise<ArrayBuffer> {
-  const res = await fetch("/api/tts", {
-    method: "POST",
-    body: JSON.stringify({ text }),
-  });
-  const data = await res.json();
-  const base64 = data.audioBase64 || data.data;
-  if (!base64) throw new Error("no audio");
-  const bin = atob(base64);
-  const bytes = new Uint8Array(bin.length);
-  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
-  return bytes.buffer;
-}
 
 export default function Home() {
   const [character, setCharacter] = useState("小猫咪");
@@ -261,7 +247,6 @@ export default function Home() {
         {showAnimation && animation && (
           <StoryAnimation
             animation={animation}
-            fetchSpeech={fetchSpeech}
             onClose={() => setShowAnimation(false)}
           />
         )}

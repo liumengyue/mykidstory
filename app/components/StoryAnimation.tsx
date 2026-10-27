@@ -21,26 +21,22 @@ export type StoryAnimationData = {
 
 type Props = {
   animation: StoryAnimationData;
-  /** 把一段文字转成 mp3 的 ArrayBuffer；失败时抛错，该段只显示字幕。 */
-  fetchSpeech: (text: string) => Promise<ArrayBuffer>;
   onClose: () => void;
 };
 
-type Status = "ready" | "loading" | "playing" | "paused" | "ended";
+// 动画不配语音（省掉语音合成费用）：只有背景音乐 + 字幕，家长照着字幕讲
+type Status = "ready" | "playing" | "paused" | "ended";
 
 type Timeline = ReturnType<typeof buildTimeline>;
 
-export default function StoryAnimation({ animation, fetchSpeech, onClose }: Props) {
+export default function StoryAnimation({ animation, onClose }: Props) {
   const wrapRef = useRef<HTMLDivElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const [status, setStatus] = useState<Status>("ready");
-  const [note, setNote] = useState("");
 
   const audioCtxRef = useRef<AudioContext | null>(null);
   const timelineRef = useRef<Timeline | null>(null);
   const startAtRef = useRef(0);
-  const voicesRef = useRef<(AudioBuffer | null)[]>([]);
-  const sourcesRef = useRef<AudioBufferSourceNode[]>([]);
   const musicRef = useRef<ReturnType<typeof startMusic> | null>(null);
   const musicBufRef = useRef<AudioBuffer | null>(null);
   const rafRef = useRef(0);
@@ -57,13 +53,6 @@ export default function StoryAnimation({ animation, fetchSpeech, onClose }: Prop
 
   function teardown(closeCtx: boolean) {
     cancelAnimationFrame(rafRef.current);
-    sourcesRef.current.forEach((s) => {
-      try {
-        s.stop();
-      } catch {}
-      s.disconnect();
-    });
-    sourcesRef.current = [];
     musicRef.current?.stop();
     musicRef.current = null;
     if (closeCtx) {
@@ -83,26 +72,8 @@ export default function StoryAnimation({ animation, fetchSpeech, onClose }: Prop
     wrapRef.current?.requestFullscreen?.().catch(() => {});
 
     if (!timelineRef.current) {
-      setStatus("loading");
-      setNote("正在准备故事声音…");
-      const voices = await Promise.all(
-        animation.scenes.map(async (s) => {
-          try {
-            const data = await fetchSpeech(s.text);
-            return await ac!.decodeAudioData(data);
-          } catch (e) {
-            console.error("旁白生成失败，改用字幕", e);
-            return null;
-          }
-        })
-      );
-      voicesRef.current = voices;
-      if (voices.some((v) => !v)) setNote("部分旁白声音生成失败，只显示字幕");
-      else setNote("");
-      timelineRef.current = buildTimeline(
-        animation,
-        animation.scenes.map((s, i) => voices[i]?.duration ?? estimateSeconds(s.text))
-      );
+      // 每段停留时间按字数估算（家长念字幕的速度），不足 3 分钟时自动补停顿
+      timelineRef.current = buildTimeline(animation, animation.scenes.map((s) => estimateSeconds(s.text)));
       musicBufRef.current = synthLoop(ac);
     }
     play(ac);
@@ -114,17 +85,6 @@ export default function StoryAnimation({ animation, fetchSpeech, onClose }: Prop
     const startAt = ac.currentTime + 0.1;
     startAtRef.current = startAt;
 
-    // 所有旁白按时间轴预先排好，暂停时整个 AudioContext 一起暂停，声画始终同步
-    tl.segments.forEach((seg) => {
-      if (seg.kind !== "narration") return;
-      const buf = voicesRef.current[seg.index];
-      if (!buf) return;
-      const src = ac.createBufferSource();
-      src.buffer = buf;
-      src.connect(ac.destination);
-      src.start(startAt + seg.start + seg.voiceAt);
-      sourcesRef.current.push(src);
-    });
     musicRef.current = startMusic(ac, musicBufRef.current!);
     setStatus("playing");
 
@@ -140,7 +100,8 @@ export default function StoryAnimation({ animation, fetchSpeech, onClose }: Prop
           return;
         }
       } else {
-        musicRef.current?.setLevel(isDancing(s) ? 0.55 : 0.07);
+        // 没有旁白，讲故事的段落音乐也保持适中音量
+        musicRef.current?.setLevel(isDancing(s) ? 0.55 : 0.3);
       }
       rafRef.current = requestAnimationFrame(loop);
     };
@@ -174,13 +135,11 @@ export default function StoryAnimation({ animation, fetchSpeech, onClose }: Prop
           {status === "ready" ? "▶ 开始看故事" : "↻ 再看一遍"}
         </button>
       )}
-      {status === "loading" && <div style={bigBtn}>准备中…</div>}
       {status === "paused" && (
         <button onClick={togglePause} style={bigBtn}>
           ▶ 继续
         </button>
       )}
-      {note && <div style={noteStyle}>{note}</div>}
       <button onClick={close} style={closeBtn} aria-label="关闭">
         ✕
       </button>
@@ -229,16 +188,4 @@ const closeBtn: React.CSSProperties = {
   border: "none",
   background: "rgba(255,255,255,0.8)",
   fontSize: 20,
-};
-
-const noteStyle: React.CSSProperties = {
-  position: "absolute",
-  bottom: 12,
-  left: "50%",
-  transform: "translateX(-50%)",
-  color: "#fff",
-  background: "rgba(0,0,0,0.5)",
-  padding: "6px 12px",
-  borderRadius: 8,
-  fontSize: 14,
 };

@@ -31,11 +31,10 @@ export async function POST(req) {
     },
 
           request: {
-            reqid: Date.now().toString(),
+            reqid: crypto.randomUUID(), // 每次请求必须唯一
             text: text,
             text_type: "plain",
 			operation: "query",
-			"reqid": "021776766294850fdbddc01000a066118586304730000f1e322ff",
           },
         }),
       }

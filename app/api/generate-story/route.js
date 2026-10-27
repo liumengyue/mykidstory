@@ -1,4 +1,8 @@
+import { CHARACTERS, BACKGROUNDS, ACTIONS, normalizeScenes, fallbackScenes, extractJson } from "../../../lib/storyScenes";
+
 export const runtime = 'edge';
+
+const list = (obj) => Object.entries(obj).map(([k, v]) => `${k}（${v}）`).join("、");
 export async function POST(req) {
   try {
     const body = await req.json();
@@ -52,12 +56,27 @@ export async function POST(req) {
 - 故事发生在：${scene}
 - 主题：${theme}
 - 故事灵感来自宝宝的想法：${child_input}
-- 只输出故事正文
 - 不要标题
 - 不要解释
-- 每段换行
 
-输出必须是纯文本，接近波西和皮普的故事风格
+输出风格接近波西和皮普的故事。
+
+【输出格式】
+只输出一个 JSON 对象，不要任何其他文字，不要代码块标记：
+{
+  "paragraphs": ["第1段", "第2段", "第3段", "第4段"],
+  "hero": "主角形象",
+  "friend": "配角形象，或 null",
+  "scenes": [
+    { "bg": "背景", "friend_present": true, "hero_action": "主角动作", "friend_action": "配角动作" }
+  ]
+}
+
+字段说明（这些字段用来生成动画，只能从下面的英文值里选）：
+- hero / friend 只能是：${list(CHARACTERS)}。主角“${character}”如果不在其中，选外形最接近的一个。
+- bg 只能是：${list(BACKGROUNDS)}
+- hero_action / friend_action 只能是：${list(ACTIONS)}
+- scenes 与 paragraphs 一一对应，共4个；动作要符合该段的情绪
 `;
 
     const response = await fetch("https://api.siliconflow.cn/v1/chat/completions", {
@@ -74,16 +93,37 @@ export async function POST(req) {
             content: prompt,
           },
         ],
-        max_tokens: 600,
+        max_tokens: 1500,
         temperature: 0.8,
       }),
     });
 
+    if (!response.ok) {
+      const detail = await response.text();
+      console.error("LLM_ERROR:", response.status, detail);
+      return Response.json(
+        { error: "LLM_FAILED", status: response.status },
+        { status: 502 }
+      );
+    }
+
     const data = await response.json();
+    const content = data?.choices?.[0]?.message?.content || "";
+    const input = { character, scene };
 
-    const story = data?.choices?.[0]?.message?.content || "";
+    // 优先用模型给的结构化分镜；解析失败就把整段回复当纯文本故事拆分
+    let animation = normalizeScenes(extractJson(content), input);
+    if (!animation) animation = fallbackScenes(content, input);
 
-    return Response.json({ story });
+    const story = animation
+      ? animation.scenes.map((s) => s.text).join("\n")
+      : content;
+
+    if (!story) {
+      return Response.json({ error: "EMPTY_STORY" }, { status: 502 });
+    }
+
+    return Response.json({ story, animation });
 
   } catch (err) {
     return Response.json(

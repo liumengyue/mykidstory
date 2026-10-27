@@ -1,6 +1,22 @@
 "use client";
 
 import { useState, useRef } from "react";
+import StoryAnimation, { type StoryAnimationData } from "./components/StoryAnimation";
+
+/** 调用 /api/tts，返回 mp3 的二进制数据 */
+async function fetchSpeech(text: string): Promise<ArrayBuffer> {
+  const res = await fetch("/api/tts", {
+    method: "POST",
+    body: JSON.stringify({ text }),
+  });
+  const data = await res.json();
+  const base64 = data.audioBase64 || data.data;
+  if (!base64) throw new Error("no audio");
+  const bin = atob(base64);
+  const bytes = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+  return bytes.buffer;
+}
 
 export default function Home() {
   const [character, setCharacter] = useState("小猫咪");
@@ -10,6 +26,8 @@ export default function Home() {
   const [length, setLength] = useState("中");
 
   const [story, setStory] = useState("");
+  const [animation, setAnimation] = useState<StoryAnimationData | null>(null);
+  const [showAnimation, setShowAnimation] = useState(false);
   const [loading, setLoading] = useState(false);
 
   const [playing, setPlaying] = useState(false);
@@ -26,6 +44,8 @@ export default function Home() {
   const generateStory = async () => {
     setLoading(true);
     setStory("");
+    setAnimation(null);
+    setAudioUrl(null);
     stopAudio();
 
     try {
@@ -41,7 +61,12 @@ export default function Home() {
       });
 
       const data = await res.json();
+      if (!res.ok) {
+        alert("故事生成失败，请稍后再试");
+        return;
+      }
       setStory(data.story || "");
+      setAnimation(data.animation || null);
     } catch (e) {
       console.error(e);
     } finally {
@@ -200,6 +225,18 @@ export default function Home() {
           </button>
         </div>
 
+        {animation && (
+          <button
+            onClick={() => {
+              stopAudio();
+              setShowAnimation(true);
+            }}
+            style={btnAnimation}
+          >
+            🎬 看动画
+          </button>
+        )}
+
         {/* 进度条 */}
         {audioUrl && (
           <div style={{ marginTop: 10 }}>
@@ -219,6 +256,14 @@ export default function Home() {
 
         {/* 故事 */}
         {story && <div style={storyBox}>{story}</div>}
+
+        {showAnimation && animation && (
+          <StoryAnimation
+            animation={animation}
+            fetchSpeech={fetchSpeech}
+            onClose={() => setShowAnimation(false)}
+          />
+        )}
 
         {/* 🎧 核心播放器 */}
         <audio
@@ -283,6 +328,16 @@ const btnPlay: React.CSSProperties = {
   color: "#fff",
   padding: 10,
   borderRadius: 10,
+};
+
+const btnAnimation: React.CSSProperties = {
+  width: "100%",
+  marginTop: 10,
+  background: "#9b6bff",
+  color: "#fff",
+  padding: 12,
+  borderRadius: 10,
+  fontSize: 18,
 };
 
 const btnStop: React.CSSProperties = {
